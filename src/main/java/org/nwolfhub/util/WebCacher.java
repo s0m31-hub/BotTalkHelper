@@ -26,16 +26,14 @@ public class WebCacher {
     private final FieldRepository fieldRepository;
     private final SectionRepository sectionRepository;
     private final UnitRepository unitRepository;
-    public WebCacher(FieldRepository fieldRepository, SectionRepository sectionRepository, UnitRepository unitRepository) throws IOException {
-        botapi = Jsoup.connect("https://core.telegram.org/bots/api").get();
-        tdapi = Jsoup.connect("https://corefork.telegram.org/methods").get();
+    public WebCacher(FieldRepository fieldRepository, SectionRepository sectionRepository, UnitRepository unitRepository) {
         this.fieldRepository = fieldRepository;
         this.sectionRepository = sectionRepository;
         this.unitRepository = unitRepository;
     }
-
-    @PostConstruct
-    public void reCache() {
+    public void reCache() throws IOException {
+        botapi = Jsoup.connect("https://core.telegram.org/bots/api").get();
+        tdapi = Jsoup.connect("https://corefork.telegram.org/methods").get();
         List<Element> elements = Xsoup.compile("//*[@id=\"dev_page_content\"]").evaluate(botapi).getElements().get(0).children();
         Section lastSection=null;
         Unit lastUnit = null;
