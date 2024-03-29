@@ -1,5 +1,6 @@
 package org.nwolfhub.database.model;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
@@ -11,6 +12,7 @@ public class Field {
     public String name;
     public String type;
     public Boolean required;
+    @Column(length = 4096)
     public String description;
 
     public Field() {

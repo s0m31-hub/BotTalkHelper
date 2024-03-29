@@ -1,5 +1,6 @@
 package org.nwolfhub.util;
 
+import jakarta.annotation.PostConstruct;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -33,6 +34,7 @@ public class WebCacher {
         this.unitRepository = unitRepository;
     }
 
+    @PostConstruct
     public void reCache() {
         List<Element> elements = Xsoup.compile("//*[@id=\"dev_page_content\"]").evaluate(botapi).getElements().get(0).children();
         Section lastSection=null;
@@ -81,7 +83,9 @@ public class WebCacher {
                 }
             }
         }
-
+        fieldRepository.saveAll(fields);
+        unitRepository.saveAll(units);
+        sectionRepository.saveAll(sections);
         System.out.println("Recaching complete");
     }
 }

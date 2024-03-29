@@ -9,6 +9,7 @@ import java.util.List;
 public class Unit {
     @Id
     public String name;
+    @Column(length = 4096)
     public String description;
     @ManyToMany
     @JoinTable(schema = "bottalk", name = "field_mappings", joinColumns = @JoinColumn(name = "name"), inverseJoinColumns = @JoinColumn(name = "field_name", referencedColumnName = "name"))
