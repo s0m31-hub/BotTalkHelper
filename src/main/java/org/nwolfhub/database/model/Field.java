@@ -1,6 +1,13 @@
-package org.nwolfhub.model;
+package org.nwolfhub.database.model;
 
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
+@Entity
+@Table(schema = "bottalk")
 public class Field {
+    @Id
     public String name;
     public String type;
     public Boolean required;

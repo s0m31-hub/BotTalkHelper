@@ -1,10 +1,17 @@
-package org.nwolfhub.model;
+package org.nwolfhub.database.model;
+
+import jakarta.persistence.*;
 
 import java.util.List;
 
+@Entity
+@Table(schema = "bottalk")
 public class Unit {
+    @Id
     public String name;
     public String description;
+    @ManyToMany
+    @JoinTable(schema = "bottalk", name = "field_mappings", joinColumns = @JoinColumn(name = "name"), inverseJoinColumns = @JoinColumn(name = "field_name", referencedColumnName = "name"))
     public List<Field> fields;
 
     public Unit() {
@@ -40,6 +47,11 @@ public class Unit {
 
     public Unit setFields(List<Field> fields) {
         this.fields = fields;
+        return this;
+    }
+
+    public Unit addField(Field field) {
+        this.fields.add(field);
         return this;
     }
 }
