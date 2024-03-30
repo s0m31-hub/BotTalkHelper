@@ -42,4 +42,4 @@ bin/
 .DS_Store
 
 bot.cfg
-application.yml
+/application.yml

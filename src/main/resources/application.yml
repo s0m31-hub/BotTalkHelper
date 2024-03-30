@@ -1,0 +1,15 @@
+bot:
+  token: your-bot-token
+  admins: 804995878,334297800,24421134
+spring:
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  datasource:
+    url: jdbc:postgresql://address:port/database
+    username: username
+    password: password
+    driver-class-name: org.postgresql.Driver

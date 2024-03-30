@@ -17,6 +17,7 @@ import com.pengrad.telegrambot.response.BaseResponse;
 import com.pengrad.telegrambot.response.SendResponse;
 import jakarta.annotation.PostConstruct;
 import org.nwolfhub.database.model.PreparedMessage;
+import org.nwolfhub.database.model.Unit;
 import org.nwolfhub.database.repositories.FieldRepository;
 import org.nwolfhub.database.repositories.MessagesRepository;
 import org.nwolfhub.database.repositories.SectionRepository;
@@ -27,10 +28,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
+import java.util.*;
 
 @Service
 public class UpdateHandler {
@@ -44,6 +42,7 @@ public class UpdateHandler {
     private final SectionRepository sectionRepository;
     private final UnitRepository unitRepository;
     private final MessagesRepository messagesRepository;
+    private final Random random = new Random();
 
     private final WebCacher cacher;
 
@@ -88,12 +87,25 @@ public class UpdateHandler {
             replyWithPrepared(query.id(), preparedMessages);
         } else {
             String[] words = queryText.split(" ");
+            queryText = queryText.replace(".", "\\.")
+                    .replace("\\", "\\\\")
+                    .replace("!", "\\!")
+                    .replace("*", "\\*")
+                    .replace("_", "\\_")
+                    .replace("~", "\\~")
+                    .replace("`", "\\`")
+                    .replace(">", "\\>");
             for(String word:words) {
                 if(cacher.units.containsKey(word)) {
-                    
+                    queryText = queryText.replace(word, formatUnit(cacher.units.get(word)));
                 }
             }
+            replyWithPrepared(query.id(), List.of(new PreparedMessage(random.nextLong(), queryText, from.id(), false)));
         }
+    }
+
+    private String formatUnit(Unit unit) {
+        return "https://core.telegram.org/bots/api#" + unit.getName().toLowerCase().replace(" ", "-");
     }
 
     private void replyWithPrepared(String id, List<PreparedMessage> messages) {
