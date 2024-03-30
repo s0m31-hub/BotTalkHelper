@@ -83,9 +83,16 @@ public class UpdateHandler {
     private void handleInline(InlineQuery query) {
         User from = query.from();
         String queryText = query.query();
-        if(queryText.equals("")) {
+        if(queryText.isEmpty()) {
             List<PreparedMessage> preparedMessages = messagesRepository.getPreparedMessagesByGlobalOrOwner(true, from.id());
             replyWithPrepared(query.id(), preparedMessages);
+        } else {
+            String[] words = queryText.split(" ");
+            for(String word:words) {
+                if(cacher.units.containsKey(word)) {
+                    
+                }
+            }
         }
     }
 
@@ -96,11 +103,12 @@ public class UpdateHandler {
                     new InlineQueryResultArticle(
                             String.valueOf(message.id),
                             "Saved message",
-                            message.getText()
+                            ""
                     ).inputMessageContent(new InputTextMessageContent(message.getText()).parseMode(ParseMode.MarkdownV2))
+                            .description(message.text.substring(0, Math.min(40, message.text.length())) + "...")
             );
         }
-        response = bot.execute(new AnswerInlineQuery(id, articles.toArray(new InlineQueryResult[0])).cacheTime(0));
+        bot.execute(new AnswerInlineQuery(id, articles.toArray(new InlineQueryResult[0])).cacheTime(0));
     }
 
 

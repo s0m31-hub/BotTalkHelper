@@ -16,6 +16,7 @@ import us.codecraft.xsoup.Xsoup;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Objects;
 
@@ -23,6 +24,7 @@ import java.util.Objects;
 public class WebCacher {
     private Document botapi;
     private Document tdapi;
+    public HashMap<String, Unit> units;
     private final FieldRepository fieldRepository;
     private final SectionRepository sectionRepository;
     private final UnitRepository unitRepository;
@@ -30,6 +32,7 @@ public class WebCacher {
         this.fieldRepository = fieldRepository;
         this.sectionRepository = sectionRepository;
         this.unitRepository = unitRepository;
+        units = new HashMap<>();
     }
     public void reCache() throws IOException {
         botapi = Jsoup.connect("https://core.telegram.org/bots/api").get();
@@ -81,6 +84,7 @@ public class WebCacher {
                 }
             }
         }
+        units.forEach(e -> this.units.put(e.getName(), e));
         fieldRepository.saveAll(fields);
         unitRepository.saveAll(units);
         sectionRepository.saveAll(sections);
