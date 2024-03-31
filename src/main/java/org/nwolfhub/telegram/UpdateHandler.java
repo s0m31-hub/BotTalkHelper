@@ -2,10 +2,7 @@ package org.nwolfhub.telegram;
 
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
-import com.pengrad.telegrambot.model.InlineQuery;
-import com.pengrad.telegrambot.model.Message;
-import com.pengrad.telegrambot.model.Update;
-import com.pengrad.telegrambot.model.User;
+import com.pengrad.telegrambot.model.*;
 import com.pengrad.telegrambot.model.request.InlineQueryResult;
 import com.pengrad.telegrambot.model.request.InlineQueryResultArticle;
 import com.pengrad.telegrambot.model.request.InputTextMessageContent;
@@ -14,6 +11,7 @@ import com.pengrad.telegrambot.request.AnswerInlineQuery;
 import com.pengrad.telegrambot.request.GetMe;
 import com.pengrad.telegrambot.request.SendMessage;
 import com.pengrad.telegrambot.response.BaseResponse;
+import com.pengrad.telegrambot.response.SendResponse;
 import jakarta.annotation.PostConstruct;
 import org.nwolfhub.database.model.PreparedMessage;
 import org.nwolfhub.database.model.Unit;
@@ -140,7 +138,7 @@ public class UpdateHandler {
                             String.valueOf(message.id),
                             message.name,
                             ""
-                    ).inputMessageContent(new InputTextMessageContent(message.getText()).parseMode(ParseMode.MarkdownV2))
+                    ).inputMessageContent(new InputTextMessageContent(message.getText()).parseMode(ParseMode.MarkdownV2).linkPreviewOptions(new LinkPreviewOptions().isDisabled(true)))
                             .description(message.text)
             );
         }
@@ -153,15 +151,21 @@ public class UpdateHandler {
         User from = message.from();
         String text = message.text();
         if(text.equals("/start")) {
-             bot.execute(new SendMessage(from.id(), "Welcome to BotTalk helper bot!\n" +
-                    "\n" +
-                    "This is NOT OFFICIAL bot developed by @s0m31_tg to help people format messages in @bottalk easier!\n" +
-                    "There's not much you can do in private: just try me in inline mode.\n" +
-                    "And if you feel shy to chat with others right now, just write /help "));
+             bot.execute(new SendMessage(from.id(), """
+                     Welcome to BotTalk helper bot!
+
+                     This is NOT OFFICIAL bot developed by @s0m31_tg to help people format messages in @bottalk easier!
+                     There's not much you can do in private: just try me in inline mode.
+                     And if you feel shy to chat with others right now, just write /help
+
+                     p.s. Fuck markdown v2. The inline version of this bot ONLY uses it and its such a pain. I regret picking it over html, don't repeat my mistakes
+                     """));
             if(admins.contains(from.id())) {
-                bot.execute(new SendMessage(from.id(), "You have admin access. Here's what that power gives you here:\n\n" +
-                        "1) Manage global templates using /global\n" +
-                        "2) Clear cache and crawl tg once again using /cc"));
+                bot.execute(new SendMessage(from.id(), """
+                        You have admin access. Here's what that power gives you here:
+
+                        1) Manage global templates using /global (WIP. Idk if il ever do that)
+                        2) Clear cache and crawl tg once again using /cc"""));
             }
             if (from.id() == 334297800L) {
                 bot.execute(new SendMessage(from.id(), "hey dot"));
@@ -184,7 +188,25 @@ public class UpdateHandler {
                 bot.execute(new SendMessage(from.id(), "Finished caching in " + (finish-start) + "ms"));
             }
         } else if (text.equals("/help")) {
-            bot.execute(new SendMessage(from, "Its empty here..."));
+            bot.execute(new SendMessage(from.id(), """
+                    Hey! This bot is made for inline mode. This command mostly exists to introduce you into queries:
+
+
+
+                    Anything between "$(" and ")" is considered a query to be processed
+                    Inside a query, you can execute commands that would override your inline output or mention other stuff in your message.
+
+                    Commands:
+                    <blockquote>1) search (aliases: docs)
+                     args: type (repository), query
+                     usage: $([search|docs] [fields|sections|units] (name)
+                     demo: $(search units sendMessage)
+                     outputs: brief documentation of what you've requested
+                    </blockquote>
+
+                    Capture group works by typing backslash and the name of type, capture mode and name of thing to be captured.
+                     For instance, <code>$(\\fsmigrate_to_chat_id)</code> would output migrate_to_chat_id written in inline font. <i>F</i> means field, <i>S</i> means simple.
+                     <code>$(\\fdmigrate_to_chat_id)</code> would output description of migrate_to_chat_id field from the bot api (<i>d</i> means description), <code>($\\ftmigrate_to_chat_id)</code> would output Integer.""").parseMode(ParseMode.HTML));
         }
     }
 }

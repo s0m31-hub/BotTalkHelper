@@ -118,10 +118,10 @@ public class QueryProcessor {
                                 if(!fields.isEmpty()) {
                                     fields.append("\n\n");
                                 }
-                                fields.append(field.name).append(": ").append(field.type).append("\n").append(field.description);
-                                if(field.required!=null) fields.append("\nrequired: ").append(field.required);
+                                fields.append("*").append(replace(field.name)).append("*").append(": _").append(field.type).append("_\n__").append(replace(field.description)).append("__");
+                                if(field.required!=null) fields.append("\n*required*: _").append(field.required).append("_");
                             }
-                            replaceSpecials(preparedMessages, unit.getName(), unit.description + (fields.isEmpty()?"":"\n\nfields:\n" + fields));
+                            replaceSpecials(preparedMessages, unit.getName(), ">" + replace(unit.description) + "**" + (fields.isEmpty()?"":"\n\nfields:\n" + fields));
                         }
                         return new QueryResult(preparedMessages);
                     }
@@ -129,7 +129,7 @@ public class QueryProcessor {
                         List<Field> found = fieldRepository.findTop5ByNameLikeIgnoreCase("%" + toSearch + "%");
                         List<PreparedMessage> preparedMessages = new ArrayList<>();
                         for(Field unit:found) {
-                            replaceSpecials(preparedMessages, unit.getName(), unit.description);
+                            replaceSpecials(preparedMessages, unit.getName(), ">" + replace(unit.description) + "**");
                         }
                         return new QueryResult(preparedMessages);
                     }
@@ -137,7 +137,7 @@ public class QueryProcessor {
                         List<Section> found = sectionRepository.findTop5ByNameLikeIgnoreCase("%" + toSearch + "%");
                         List<PreparedMessage> preparedMessages = new ArrayList<>();
                         for(Section unit:found) {
-                            replaceSpecials(preparedMessages, unit.getName(), unit.getName());
+                            replaceSpecials(preparedMessages, unit.getName(), "[" + replace(unit.getName()) + "](https://core.telegram.org/bots/api#" + replace(unit.getName()).toLowerCase().replace(" ", "-") + ")");
                         }
                         return new QueryResult(preparedMessages);
                     }
@@ -152,7 +152,7 @@ public class QueryProcessor {
                 new PreparedMessage(
                         random.nextLong(),
                         name,
-                        "*Documentation about __" + name + "__*:\n\n" + replace(description),
+                        "*Documentation about __" + replace(name) + "__*:\n\n" + description,
                         1L,
                         false
                 )
