@@ -29,7 +29,10 @@ public class WebCacher {
         this.fieldRepository = fieldRepository;
         this.sectionRepository = sectionRepository;
         this.unitRepository = unitRepository;
-        units = new TreeMap<>();
+        units = new HashMap<>();
+        List<Unit> timedUnits = unitRepository.getAllByDescriptionNot("123");
+        timedUnits.forEach(e -> this.units.put(e.getName(), e));
+        //System.out.println("Loaded");
     }
     public void reCache() throws IOException {
         botapi = Jsoup.connect("https://core.telegram.org/bots/api").get();

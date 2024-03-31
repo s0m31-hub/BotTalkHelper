@@ -29,6 +29,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.regex.Pattern;
 
 @Service
 public class UpdateHandler {
@@ -84,11 +85,12 @@ public class UpdateHandler {
         String queryText = query.query();
         if(queryText.isEmpty()) {
             List<PreparedMessage> preparedMessages = messagesRepository.getPreparedMessagesByGlobalOrOwner(true, from.id());
-            replyWithPrepared(query.id(), preparedMessages);
+            replyWithPrepared("Saved message", query.id(), preparedMessages);
         } else {
             String[] words = queryText.split(" ");
-            queryText = queryText.replace(".", "\\.")
+            queryText = queryText
                     .replace("\\", "\\\\")
+                    .replace(".", "\\.")
                     .replace("!", "\\!")
                     .replace("*", "\\*")
                     .replace("_", "\\_")
@@ -96,31 +98,32 @@ public class UpdateHandler {
                     .replace("`", "\\`")
                     .replace(">", "\\>");
             for(String word:words) {
-                if(cacher.units.containsKey(word)) {
-                    queryText = queryText.replace(word, formatUnit(cacher.units.get(word)));
+                String unspecializedWord = word.replaceAll("\\W", "");
+                if(cacher.units.containsKey(unspecializedWord)) {
+                    queryText = queryText.replaceFirst("(?<!#)\\b(" + unspecializedWord + ")\\b", formatUnit(cacher.units.get(unspecializedWord)));
                 }
             }
-            replyWithPrepared(query.id(), List.of(new PreparedMessage(random.nextLong(), queryText, from.id(), false)));
+            replyWithPrepared("Prepared message", query.id(), List.of(new PreparedMessage(random.nextLong(), queryText, from.id(), false)));
         }
     }
 
     private String formatUnit(Unit unit) {
-        return "https://core.telegram.org/bots/api#" + unit.getName().toLowerCase().replace(" ", "-");
+        return "[" +unit.getName() + "](https://core.telegram.org/bots/api#" + unit.getName().toLowerCase().replace(" ", "-") + ")";
     }
 
-    private void replyWithPrepared(String id, List<PreparedMessage> messages) {
+    private void replyWithPrepared(String name, String id, List<PreparedMessage> messages) {
         List<InlineQueryResultArticle> articles = new ArrayList<>();
         for(PreparedMessage message:messages) {
             articles.add(
                     new InlineQueryResultArticle(
                             String.valueOf(message.id),
-                            "Saved message",
+                            name,
                             ""
                     ).inputMessageContent(new InputTextMessageContent(message.getText()).parseMode(ParseMode.MarkdownV2))
                             .description(message.text.substring(0, Math.min(40, message.text.length())) + "...")
             );
         }
-        bot.execute(new AnswerInlineQuery(id, articles.toArray(new InlineQueryResult[0])).cacheTime(0));
+        BaseResponse response = bot.execute(new AnswerInlineQuery(id, articles.toArray(new InlineQueryResult[0])).cacheTime(0));
     }
 
 
@@ -143,6 +146,8 @@ public class UpdateHandler {
                 bot.execute(new SendMessage(from.id(), "hey dot"));
             } else if(from.id() == 24421134L) {
                 bot.execute(new SendMessage(from.id(), "hey rico"));
+            } else if(from.id() == 611938392L) {
+                bot.execute(new SendMessage(from.id(), "GODOOOOOO"));
             }
         } else if(text.equals("/cc")) {
             if(admins.contains(from.id())) {
