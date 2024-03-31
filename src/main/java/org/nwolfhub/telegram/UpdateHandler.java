@@ -14,7 +14,6 @@ import com.pengrad.telegrambot.request.AnswerInlineQuery;
 import com.pengrad.telegrambot.request.GetMe;
 import com.pengrad.telegrambot.request.SendMessage;
 import com.pengrad.telegrambot.response.BaseResponse;
-import com.pengrad.telegrambot.response.SendResponse;
 import jakarta.annotation.PostConstruct;
 import org.nwolfhub.database.model.PreparedMessage;
 import org.nwolfhub.database.model.Unit;
@@ -22,17 +21,19 @@ import org.nwolfhub.database.repositories.FieldRepository;
 import org.nwolfhub.database.repositories.MessagesRepository;
 import org.nwolfhub.database.repositories.SectionRepository;
 import org.nwolfhub.database.repositories.UnitRepository;
+import org.nwolfhub.util.QueryProcessor;
 import org.nwolfhub.util.WebCacher;
 import org.nwolfhub.utils.Utils;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Service
 public class UpdateHandler {
+    public static final char[] toEscape = new char[] {'_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!'};
     @Value("${bot.token}")
     private String botToken;
     @Value("${bot.admins}")
@@ -44,14 +45,16 @@ public class UpdateHandler {
     private final UnitRepository unitRepository;
     private final MessagesRepository messagesRepository;
     private final Random random = new Random();
+    private final QueryProcessor processor;
 
     private final WebCacher cacher;
 
-    public UpdateHandler(FieldRepository fieldRepository, SectionRepository sectionRepository, UnitRepository unitRepository, MessagesRepository messagesRepository, WebCacher cacher) {
+    public UpdateHandler(FieldRepository fieldRepository, SectionRepository sectionRepository, UnitRepository unitRepository, MessagesRepository messagesRepository, QueryProcessor processor, WebCacher cacher) {
         this.fieldRepository = fieldRepository;
         this.sectionRepository = sectionRepository;
         this.unitRepository = unitRepository;
         this.messagesRepository = messagesRepository;
+        this.processor = processor;
         this.cacher = cacher;
     }
 
@@ -85,25 +88,43 @@ public class UpdateHandler {
         String queryText = query.query();
         if(queryText.isEmpty()) {
             List<PreparedMessage> preparedMessages = messagesRepository.getPreparedMessagesByGlobalOrOwner(true, from.id());
-            replyWithPrepared("Saved message", query.id(), preparedMessages);
+            replyWithPrepared(query.id(), preparedMessages);
         } else {
+            Matcher matcher = Pattern.compile("(\\$\\((.*?)\\))").matcher(queryText);
+            HashMap<String, String> toLaterReplace = new HashMap<>();
+            while (matcher.find()) {
+                String group = matcher.group();
+                try {
+                    QueryProcessor.QueryResult result = processor.processQuery(group.replace("$(", "").substring(0, group.length() - 3));
+                    if (result.override) {
+                        replyWithPrepared(query.id(), result.preparedMessages);
+                        return;
+                    } else {
+                        String id = Utils.generateString(30);
+                        queryText = queryText.replace(group, id);
+                        toLaterReplace.put(id, result.result);
+                    }
+                } catch (IllegalStateException | IllegalArgumentException e) {
+                    replyWithPrepared(query.id(), List.of(new PreparedMessage(0L, "Wrong query", e.getMessage(), query.from().id(), false)));
+                } catch (ArrayIndexOutOfBoundsException e) {
+                    replyWithPrepared(query.id(), List.of(new PreparedMessage(0L, "Unfinished query", "Please finish your query", query.from().id(), false)));
+                }
+            }
             String[] words = queryText.split(" ");
-            queryText = queryText
-                    .replace("\\", "\\\\")
-                    .replace(".", "\\.")
-                    .replace("!", "\\!")
-                    .replace("*", "\\*")
-                    .replace("_", "\\_")
-                    .replace("~", "\\~")
-                    .replace("`", "\\`")
-                    .replace(">", "\\>");
+            queryText = queryText.replace("\\", "\\\\");
+            for(char c:toEscape) {
+                queryText = queryText.replace(String.valueOf(c), "\\" + c);
+            }
             for(String word:words) {
                 String unspecializedWord = word.replaceAll("\\W", "");
                 if(cacher.units.containsKey(unspecializedWord)) {
                     queryText = queryText.replaceFirst("(?<!#)\\b(" + unspecializedWord + ")\\b", formatUnit(cacher.units.get(unspecializedWord)));
                 }
             }
-            replyWithPrepared("Prepared message", query.id(), List.of(new PreparedMessage(random.nextLong(), queryText, from.id(), false)));
+            for(String key:toLaterReplace.keySet()) {
+                queryText = queryText.replace(key, toLaterReplace.get(key));
+            }
+            replyWithPrepared(query.id(), List.of(new PreparedMessage(random.nextLong(), "Bot API", queryText, from.id(), false)));
         }
     }
 
@@ -111,19 +132,19 @@ public class UpdateHandler {
         return "[" +unit.getName() + "](https://core.telegram.org/bots/api#" + unit.getName().toLowerCase().replace(" ", "-") + ")";
     }
 
-    private void replyWithPrepared(String name, String id, List<PreparedMessage> messages) {
+    private void replyWithPrepared(String id, List<PreparedMessage> messages) {
         List<InlineQueryResultArticle> articles = new ArrayList<>();
-        for(PreparedMessage message:messages) {
+        for (PreparedMessage message : messages) {
             articles.add(
                     new InlineQueryResultArticle(
                             String.valueOf(message.id),
-                            name,
+                            message.name,
                             ""
                     ).inputMessageContent(new InputTextMessageContent(message.getText()).parseMode(ParseMode.MarkdownV2))
-                            .description(message.text.substring(0, Math.min(40, message.text.length())) + "...")
+                            .description(message.text)
             );
         }
-        BaseResponse response = bot.execute(new AnswerInlineQuery(id, articles.toArray(new InlineQueryResult[0])).cacheTime(0));
+        bot.execute(new AnswerInlineQuery(id, articles.toArray(new InlineQueryResult[0])).cacheTime(0));
     }
 
 

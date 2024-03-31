@@ -1,12 +1,9 @@
 package org.nwolfhub.database.model;
 
-import com.pengrad.telegrambot.model.MessageEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
-
-import java.util.List;
 
 @Entity
 @Table(schema = "bottalk", name = "saved")
@@ -17,6 +14,7 @@ public class PreparedMessage {
     public String text;
     public Long owner;
     public boolean global;
+    public String name;
     public PreparedMessage() {}
 
     public PreparedMessage(Long id, String text, Long owner, boolean global) {
@@ -24,6 +22,14 @@ public class PreparedMessage {
         this.text = text;
         this.owner = owner;
         this.global = global;
+    }
+
+    public PreparedMessage(Long id, String name, String text, Long owner, boolean global) {
+        this.id = id;
+        this.text = text;
+        this.owner = owner;
+        this.global = global;
+        this.name = name;
     }
 
     public Long getId() {
@@ -59,6 +65,15 @@ public class PreparedMessage {
 
     public PreparedMessage setGlobal(boolean global) {
         this.global = global;
+        return this;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public PreparedMessage setName(String preview) {
+        this.name = preview;
         return this;
     }
 }

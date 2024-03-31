@@ -11,7 +11,7 @@ public class Unit {
     public String name;
     @Column(length = 4096)
     public String description;
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(schema = "bottalk", name = "field_mappings", joinColumns = @JoinColumn(name = "name"), inverseJoinColumns = @JoinColumn(name = "field_name", referencedColumnName = "name"))
     public List<Field> fields;
 
