@@ -29,7 +29,7 @@ public class WebCacher {
         this.fieldRepository = fieldRepository;
         this.sectionRepository = sectionRepository;
         this.unitRepository = unitRepository;
-        units = new HashMap<>();
+        units = new TreeMap<>(String.CASE_INSENSITIVE_ORDER);
         List<Unit> timedUnits = unitRepository.getAllByDescriptionNot("123");
         timedUnits.forEach(e -> this.units.put(e.getName(), e));
         //System.out.println("Loaded");
