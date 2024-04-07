@@ -3,15 +3,10 @@ package org.nwolfhub.telegram;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.*;
-import com.pengrad.telegrambot.model.request.InlineQueryResult;
-import com.pengrad.telegrambot.model.request.InlineQueryResultArticle;
-import com.pengrad.telegrambot.model.request.InputTextMessageContent;
-import com.pengrad.telegrambot.model.request.ParseMode;
+import com.pengrad.telegrambot.model.request.*;
 import com.pengrad.telegrambot.request.AnswerInlineQuery;
 import com.pengrad.telegrambot.request.GetMe;
 import com.pengrad.telegrambot.request.SendMessage;
-import com.pengrad.telegrambot.response.BaseResponse;
-import com.pengrad.telegrambot.response.SendResponse;
 import jakarta.annotation.PostConstruct;
 import org.nwolfhub.database.model.PreparedMessage;
 import org.nwolfhub.database.model.Unit;
@@ -46,6 +41,8 @@ public class UpdateHandler {
     private final QueryProcessor processor;
 
     private final WebCacher cacher;
+
+    private final Map<Long, String> states = new HashMap<>();
 
     public UpdateHandler(FieldRepository fieldRepository, SectionRepository sectionRepository, UnitRepository unitRepository, MessagesRepository messagesRepository, QueryProcessor processor, WebCacher cacher) {
         this.fieldRepository = fieldRepository;
@@ -145,6 +142,65 @@ public class UpdateHandler {
         bot.execute(new AnswerInlineQuery(id, articles.toArray(new InlineQueryResult[0])).cacheTime(0));
     }
 
+    private void processCallbackQuery(Update update) {
+        Long from = update.callbackQuery().from().id();
+        String query = update.callbackQuery().data();
+        if(query.equals("newTmp")) {
+            Integer count = messagesRepository.countByOwner(from);
+            if(count<5) {
+                states.put(from, "newTmp");
+                bot.execute(new SendMessage(from, "Great! Now send the name of your new template"));
+            } else {
+                bot.execute(new SendMessage(from, "You have maximum amount of templates"));
+            }
+        }
+        else if(query.contains("editTmp")) {
+            String tmpId = query.split("editTmp")[1];
+            Optional<PreparedMessage> optionalMesssage = messagesRepository.findPreparedMessageById(Long.valueOf(tmpId));
+            if(optionalMesssage.isPresent()) {
+                PreparedMessage preparedMessage = optionalMesssage.get();
+                if(preparedMessage.getOwner().equals(from) || (preparedMessage.global && admins.contains(from))) {
+                    buildSingleTemplate(from, preparedMessage);
+                }
+            }
+        } else if(query.contains("deleteTmp")) {
+            String tmpId = query.split("deleteTmp")[1];
+            Optional<PreparedMessage> optionalMesssage = messagesRepository.findPreparedMessageById(Long.valueOf(tmpId));
+            if(optionalMesssage.isPresent()) {
+                PreparedMessage preparedMessage = optionalMesssage.get();
+                if(preparedMessage.getOwner().equals(from) || (preparedMessage.global && admins.contains(from))) {
+                    messagesRepository.delete(preparedMessage);
+                    bot.execute(new SendMessage(from, "Template deleted"));
+                    buildTemplatesMenu(from, messagesRepository.getPreparedMessagesByOwner(from));
+                }
+            }
+        }
+    }
+
+    private void buildTemplatesMenu(Long from, List<PreparedMessage> templates) {
+        List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
+        List<InlineKeyboardButton> active = new ArrayList<>();
+        for(PreparedMessage template:templates) {
+            if(active.size()>1) {
+                buttons.add(active);
+                active = new ArrayList<>();
+            }
+            active.add(new InlineKeyboardButton(template.getName()).callbackData("editTmp" + template.getId()));
+        }
+        active.add(new InlineKeyboardButton("New").callbackData("newTmp"));
+        buttons.add(active);
+        bot.execute(new SendMessage(from, "Your templates:").replyMarkup(new InlineKeyboardMarkup(buttons.stream()
+                .map(l -> l.toArray(InlineKeyboardButton[]::new))
+                .toArray(InlineKeyboardButton[][]::new))));
+    }
+
+    private void buildSingleTemplate(Long from, PreparedMessage template) {
+        bot.execute(new SendMessage(from, "You are viewing template " + template.getName() + "\n\n" + template.getText())
+                .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton[] {new InlineKeyboardButton("Edit name").callbackData("editName" + template.getId())},
+                        new InlineKeyboardButton[] {new InlineKeyboardButton("Edit description").callbackData("editDesc" + template.getId())},
+                        new InlineKeyboardButton[] {new InlineKeyboardButton("Delete").callbackData("deleteTmp" + template.getId())})));
+    }
+
 
 
     private void handleNormalMessage(Message message) {
@@ -164,7 +220,7 @@ public class UpdateHandler {
                 bot.execute(new SendMessage(from.id(), """
                         You have admin access. Here's what that power gives you here:
 
-                        1) Manage global templates using /global (WIP. Idk if il ever do that)
+                        1) Manage global templates using /global
                         2) Clear cache and crawl tg once again using /cc"""));
             }
             if (from.id() == 334297800L) {
