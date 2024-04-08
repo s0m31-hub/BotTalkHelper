@@ -1,5 +1,7 @@
 package org.nwolfhub.telegram;
 
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.*;
@@ -145,39 +147,54 @@ public class UpdateHandler {
     private void processCallbackQuery(Update update) {
         Long from = update.callbackQuery().from().id();
         String query = update.callbackQuery().data();
-        if(query.equals("newTmp")) {
-            Integer count = messagesRepository.countByOwner(from);
-            if(count<5) {
-                states.put(from, "newTmp");
-                bot.execute(new SendMessage(from, "Great! Now send the name of your new template"));
-            } else {
-                bot.execute(new SendMessage(from, "You have maximum amount of templates"));
-            }
-        }
-        else if(query.contains("editTmp")) {
-            String tmpId = query.split("editTmp")[1];
-            Optional<PreparedMessage> optionalMesssage = messagesRepository.findPreparedMessageById(Long.valueOf(tmpId));
-            if(optionalMesssage.isPresent()) {
-                PreparedMessage preparedMessage = optionalMesssage.get();
-                if(preparedMessage.getOwner().equals(from) || (preparedMessage.global && admins.contains(from))) {
-                    buildSingleTemplate(from, preparedMessage);
+        JsonObject queryObject = JsonParser.parseString(query).getAsJsonObject();
+        String action = queryObject.get("action").getAsString();
+        switch (action) {
+            case "newTemplate" -> {
+                Integer count = messagesRepository.countByOwner(from);
+                if (count < 5) {
+                    states.put(from, query);
+                    bot.execute(new SendMessage(from, "Great! Now send the name of your new template"));
+                } else {
+                    bot.execute(new SendMessage(from, "You have maximum amount of templates"));
                 }
             }
-        } else if(query.contains("deleteTmp")) {
-            String tmpId = query.split("deleteTmp")[1];
-            Optional<PreparedMessage> optionalMesssage = messagesRepository.findPreparedMessageById(Long.valueOf(tmpId));
-            if(optionalMesssage.isPresent()) {
-                PreparedMessage preparedMessage = optionalMesssage.get();
-                if(preparedMessage.getOwner().equals(from) || (preparedMessage.global && admins.contains(from))) {
-                    messagesRepository.delete(preparedMessage);
-                    bot.execute(new SendMessage(from, "Template deleted"));
-                    buildTemplatesMenu(from, messagesRepository.getPreparedMessagesByOwner(from));
+            case "editTemplate" -> {
+                String tmpId = queryObject.get("id").getAsString();
+                Optional<PreparedMessage> optionalMessage = messagesRepository.findPreparedMessageById(Long.valueOf(tmpId));
+                if (optionalMessage.isPresent()) {
+                    PreparedMessage preparedMessage = optionalMessage.get();
+                    if (preparedMessage.getOwner().equals(from) || (preparedMessage.global && admins.contains(from))) {
+                        buildSingleTemplate(from, preparedMessage, queryObject.get("status").getAsString());
+                    }
                 }
             }
+            case "deleteTemplate" -> {
+                String tmpId = queryObject.get("id").getAsString();
+                Optional<PreparedMessage> optionalMessage = messagesRepository.findPreparedMessageById(Long.valueOf(tmpId));
+                if (optionalMessage.isPresent()) {
+                    PreparedMessage preparedMessage = optionalMessage.get();
+                    if (preparedMessage.getOwner().equals(from) || (preparedMessage.global && admins.contains(from))) {
+                        messagesRepository.delete(preparedMessage);
+                        bot.execute(new SendMessage(from, "Template deleted"));
+                        buildTemplatesMenu(from, queryObject.get("status").getAsString().equals("admin") ? messagesRepository.getPreparedMessagesByGlobal(true) : messagesRepository.getPreparedMessagesByOwner(from), queryObject.get("status").getAsString().equals("admin"));
+                    }
+                }
+            }
+            case "editTemplateName" -> {
+                states.put(from, query);
+                bot.execute(new SendMessage(from, "Send new template name"));
+            }
+            case "editTemplateDescription" -> {
+                states.put(from, query);
+                bot.execute(new SendMessage(from, "Send new template description"));
+            }
+            case "return" ->
+                    buildTemplatesMenu(from, queryObject.get("status").getAsString().equals("admin") ? messagesRepository.getPreparedMessagesByGlobal(true) : messagesRepository.getPreparedMessagesByOwner(from), queryObject.get("status").getAsString().equals("admin"));
         }
     }
 
-    private void buildTemplatesMenu(Long from, List<PreparedMessage> templates) {
+    private void buildTemplatesMenu(Long from, List<PreparedMessage> templates, boolean admin) {
         List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
         List<InlineKeyboardButton> active = new ArrayList<>();
         for(PreparedMessage template:templates) {
@@ -185,20 +202,21 @@ public class UpdateHandler {
                 buttons.add(active);
                 active = new ArrayList<>();
             }
-            active.add(new InlineKeyboardButton(template.getName()).callbackData("editTmp" + template.getId()));
+            active.add(new InlineKeyboardButton(template.getName()).callbackData("{\"action\": \"editTemplateDescription\", \"id\": " + template.getId() + ", \"source\": \"" + (admin?"admin":"normal") + "\"}"));
         }
-        active.add(new InlineKeyboardButton("New").callbackData("newTmp"));
+        active.add(new InlineKeyboardButton("New").callbackData("{\"action\": \"newTemplate\"}"));
         buttons.add(active);
         bot.execute(new SendMessage(from, "Your templates:").replyMarkup(new InlineKeyboardMarkup(buttons.stream()
                 .map(l -> l.toArray(InlineKeyboardButton[]::new))
                 .toArray(InlineKeyboardButton[][]::new))));
     }
 
-    private void buildSingleTemplate(Long from, PreparedMessage template) {
+    private void buildSingleTemplate(Long from, PreparedMessage template, String source) {
         bot.execute(new SendMessage(from, "You are viewing template " + template.getName() + "\n\n" + template.getText())
-                .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton[] {new InlineKeyboardButton("Edit name").callbackData("editName" + template.getId())},
-                        new InlineKeyboardButton[] {new InlineKeyboardButton("Edit description").callbackData("editDesc" + template.getId())},
-                        new InlineKeyboardButton[] {new InlineKeyboardButton("Delete").callbackData("deleteTmp" + template.getId())})));
+                .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton[] {new InlineKeyboardButton("Edit name").callbackData("{\"action\": \"editTemplateName\", \"id\": " + ", \"source\": \"" + source + "\"}")},
+                        new InlineKeyboardButton[] {new InlineKeyboardButton("Edit description").callbackData("{\"action\": \"editTemplateDescription\", \"id\": " + template.getId() + ", \"source\": \"" + source + "\"}")},
+                        new InlineKeyboardButton[] {new InlineKeyboardButton("Delete").callbackData("{\"action\": \"deleteTemplate\", \"id\": " + template.getId() + ", \"source\": \"" + source + "\"}")},
+                        new InlineKeyboardButton[]{new InlineKeyboardButton("Return").callbackData("{\"action\": \"return\", \"source\": \"" + source + "\"}")})));
     }
 
 
