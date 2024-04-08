@@ -9,7 +9,10 @@ import com.pengrad.telegrambot.model.request.*;
 import com.pengrad.telegrambot.request.AnswerInlineQuery;
 import com.pengrad.telegrambot.request.GetMe;
 import com.pengrad.telegrambot.request.SendMessage;
+import com.pengrad.telegrambot.request.SendPhoto;
+import com.pengrad.telegrambot.response.SendResponse;
 import jakarta.annotation.PostConstruct;
+import org.jetbrains.annotations.Nullable;
 import org.nwolfhub.database.model.PreparedMessage;
 import org.nwolfhub.database.model.Unit;
 import org.nwolfhub.database.repositories.FieldRepository;
@@ -76,6 +79,8 @@ public class UpdateHandler {
             handleNormalMessage(update.message());
         } else if(update.inlineQuery()!=null) {
             handleInline(update.inlineQuery());
+        } else if(update.callbackQuery()!=null) {
+            processCallbackQuery(update);
         }
     }
 
@@ -152,7 +157,7 @@ public class UpdateHandler {
         switch (action) {
             case "newTemplate" -> {
                 Integer count = messagesRepository.countByOwner(from);
-                if (count < 5) {
+                if (count < 5 || queryObject.get("status").getAsString().equals("admin")) {
                     states.put(from, query);
                     bot.execute(new SendMessage(from, "Great! Now send the name of your new template"));
                 } else {
@@ -188,7 +193,9 @@ public class UpdateHandler {
             case "editTemplateDescription" -> {
                 states.put(from, query);
                 bot.execute(new SendMessage(from, "Send new template description"));
-            }
+            } case "deleteTemplate1" -> bot.execute(new SendMessage(from, "Are you sure you want to delete this template?")
+                    .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton("yes").callbackData("{\"action\": \"deleteTemplate\", \"id\": " + queryObject.get("id").getAsString() + ", \"status\": \"" + queryObject.get("status").getAsString() + "\"}"),
+                            new InlineKeyboardButton("no").callbackData("{\"action\": \"return\", \"status\": \"" + queryObject.get("status") + "\"}"))));
             case "return" ->
                     buildTemplatesMenu(from, queryObject.get("status").getAsString().equals("admin") ? messagesRepository.getPreparedMessagesByGlobal(true) : messagesRepository.getPreparedMessagesByOwner(from), queryObject.get("status").getAsString().equals("admin"));
         }
@@ -202,21 +209,21 @@ public class UpdateHandler {
                 buttons.add(active);
                 active = new ArrayList<>();
             }
-            active.add(new InlineKeyboardButton(template.getName()).callbackData("{\"action\": \"editTemplateDescription\", \"id\": " + template.getId() + ", \"source\": \"" + (admin?"admin":"normal") + "\"}"));
+            active.add(new InlineKeyboardButton(template.getName()).callbackData("{\"action\": \"editTemplate\", \"id\": " + template.getId() + ", \"status\": \"" + (admin?"admin":"normal") + "\"}"));
         }
-        active.add(new InlineKeyboardButton("New").callbackData("{\"action\": \"newTemplate\"}"));
+        active.add(new InlineKeyboardButton("New").callbackData("{\"action\": \"newTemplate\", \"status\": \"" + (admin?"admin":"normal") + "\"}"));
         buttons.add(active);
-        bot.execute(new SendMessage(from, "Your templates:").replyMarkup(new InlineKeyboardMarkup(buttons.stream()
+        SendResponse response = bot.execute(new SendMessage(from, "Your templates:").replyMarkup(new InlineKeyboardMarkup(buttons.stream()
                 .map(l -> l.toArray(InlineKeyboardButton[]::new))
                 .toArray(InlineKeyboardButton[][]::new))));
     }
 
-    private void buildSingleTemplate(Long from, PreparedMessage template, String source) {
+    private void buildSingleTemplate(Long from, PreparedMessage template, String status) {
         bot.execute(new SendMessage(from, "You are viewing template " + template.getName() + "\n\n" + template.getText())
-                .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton[] {new InlineKeyboardButton("Edit name").callbackData("{\"action\": \"editTemplateName\", \"id\": " + ", \"source\": \"" + source + "\"}")},
-                        new InlineKeyboardButton[] {new InlineKeyboardButton("Edit description").callbackData("{\"action\": \"editTemplateDescription\", \"id\": " + template.getId() + ", \"source\": \"" + source + "\"}")},
-                        new InlineKeyboardButton[] {new InlineKeyboardButton("Delete").callbackData("{\"action\": \"deleteTemplate\", \"id\": " + template.getId() + ", \"source\": \"" + source + "\"}")},
-                        new InlineKeyboardButton[]{new InlineKeyboardButton("Return").callbackData("{\"action\": \"return\", \"source\": \"" + source + "\"}")})));
+                .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton[] {new InlineKeyboardButton("Edit name").callbackData("{\"action\": \"editTemplateName\", \"id\": " + ", \"status\": \"" + status + "\"}")},
+                        new InlineKeyboardButton[] {new InlineKeyboardButton("Edit description").callbackData("{\"action\": \"editTemplateDescription\", \"id\": " + template.getId() + ", \"status\": \"" + status + "\"}")},
+                        new InlineKeyboardButton[] {new InlineKeyboardButton("Delete").callbackData("{\"action\": \"deleteTemplate1\", \"id\": " + template.getId() + ", \"status\": \"" + status + "\"}")},
+                        new InlineKeyboardButton[]{new InlineKeyboardButton("Return").callbackData("{\"action\": \"return\", \"status\": \"" + status + "\"}")})));
     }
 
 
@@ -224,45 +231,47 @@ public class UpdateHandler {
     private void handleNormalMessage(Message message) {
         User from = message.from();
         String text = message.text();
-        if(text.equals("/start")) {
-             bot.execute(new SendMessage(from.id(), """
-                     Welcome to BotTalk helper bot!
-
-                     This is NOT OFFICIAL bot developed by @s0m31_tg to help people format messages in @bottalk easier!
-                     There's not much you can do in private: just try me in inline mode.
-                     And if you feel shy to chat with others right now, just write /help
-
-                     p.s. Fuck markdown v2. The inline version of this bot ONLY uses it and its such a pain. I regret picking it over html, don't repeat my mistakes
-                     """));
-            if(admins.contains(from.id())) {
+        switch (text) {
+            case "/start" -> {
                 bot.execute(new SendMessage(from.id(), """
-                        You have admin access. Here's what that power gives you here:
+                        Welcome to BotTalk helper bot!
 
-                        1) Manage global templates using /global
-                        2) Clear cache and crawl tg once again using /cc"""));
-            }
-            if (from.id() == 334297800L) {
-                bot.execute(new SendMessage(from.id(), "hey dot"));
-            } else if(from.id() == 24421134L) {
-                bot.execute(new SendMessage(from.id(), "hey rico"));
-            } else if(from.id() == 611938392L) {
-                bot.execute(new SendMessage(from.id(), "GODOOOOOO"));
-            }
-        } else if(text.equals("/cc")) {
-            if(admins.contains(from.id())) {
-                Long start = new Date().getTime();
-                System.out.println(from.id() + " requested caching at " + start);
-                bot.execute(new SendMessage(from.id(), "Started caching"));
-                try {
-                    cacher.reCache();
-                } catch (Exception e) {
-                    bot.execute(new SendMessage(from.id(), "Exception occurred: " + e.getMessage()));
+                        This is NOT OFFICIAL bot developed by @s0m31_tg to help people format messages in @bottalk easier!
+                        There's not much you can do in private: just try me in inline mode.
+                        And if you feel shy to chat with others right now, just write /help
+
+                        p.s. Fuck markdown v2. The inline version of this bot ONLY uses it and its such a pain. I regret picking it over html, don't repeat my mistakes
+                        """));
+                if (admins.contains(from.id())) {
+                    bot.execute(new SendMessage(from.id(), """
+                            You have admin access. Here's what that power gives you here:
+
+                            1) Manage global templates using /global
+                            2) Clear cache and crawl tg once again using /cc"""));
                 }
-                Long finish = new Date().getTime();
-                bot.execute(new SendMessage(from.id(), "Finished caching in " + (finish-start) + "ms"));
+                if (from.id() == 334297800L) {
+                    bot.execute(new SendMessage(from.id(), "hey dot"));
+                } else if (from.id() == 24421134L) {
+                    bot.execute(new SendMessage(from.id(), "hey rico"));
+                } else if (from.id() == 611938392L) {
+                    bot.execute(new SendMessage(from.id(), "GODOOOOOO"));
+                }
             }
-        } else if (text.equals("/help")) {
-            bot.execute(new SendMessage(from.id(), """
+            case "/cc" -> {
+                if (admins.contains(from.id())) {
+                    Long start = new Date().getTime();
+                    System.out.println(from.id() + " requested caching at " + start);
+                    bot.execute(new SendMessage(from.id(), "Started caching"));
+                    try {
+                        cacher.reCache();
+                    } catch (Exception e) {
+                        bot.execute(new SendMessage(from.id(), "Exception occurred: " + e.getMessage()));
+                    }
+                    Long finish = new Date().getTime();
+                    bot.execute(new SendMessage(from.id(), "Finished caching in " + (finish - start) + "ms"));
+                }
+            }
+            case "/help" -> bot.execute(new SendMessage(from.id(), """
                     Hey! This bot is made for inline mode. This command mostly exists to introduce you into queries:
 
 
@@ -281,6 +290,89 @@ public class UpdateHandler {
                     Capture group works by typing backslash and the name of type, capture mode and name of thing to be captured.
                      For instance, <code>$(\\fsmigrate_to_chat_id)</code> would output migrate_to_chat_id written in inline font. <i>F</i> means field, <i>S</i> means simple.
                      <code>$(\\fdmigrate_to_chat_id)</code> would output description of migrate_to_chat_id field from the bot api (<i>d</i> means description), <code>($\\ftmigrate_to_chat_id)</code> would output Integer.""").parseMode(ParseMode.HTML));
+            case "/templates" ->
+                    buildTemplatesMenu(from.id(), messagesRepository.getPreparedMessagesByOwner(from.id()), false);
+            case "/global" -> buildTemplatesMenu(from.id(), messagesRepository.getPreparedMessagesByGlobal(true), true);
+            default -> {
+                if(states.containsKey(from.id())) {
+                    JsonObject obj = JsonParser.parseString(states.get(from.id())).getAsJsonObject();
+                    switch (obj.get("action").getAsString()) {
+                        case "newTemplate" -> {
+                            if(text.length()>250) {
+                                bot.execute(new SendMessage(from.id(), "Name too long"));
+                            } else {
+                                obj.addProperty("templateName", text);
+                                obj.addProperty("action", "newTemplate2");
+                                states.put(from.id(), obj.toString());
+                                bot.execute(new SendMessage(from.id(), "Great! Now send a description for it\n\nP.s. Roj, no need to manually escape markdownv2"));
+                            }
+                        } case "newTemplate2" -> {
+                            PreparedMessage preparedMessage = new PreparedMessage();
+                            Integer id = random.nextInt()/1000;
+                            while (messagesRepository.findPreparedMessageById(id.longValue()).isPresent()) id = random.nextInt()/1000;
+                            preparedMessage.setId(id.longValue());
+                            preparedMessage.setOwner(from.id());
+                            String name = obj.get("templateName").getAsString();
+                            name = name.replace("\\", "\\\\");
+                            for(char c:toEscape) {
+                                name = name.replace(String.valueOf(c), "\\" + c);
+                            }
+                            preparedMessage.setName(name);
+                            text = text.replace("\\", "\\\\");
+                            for(char c:toEscape) {
+                                text = text.replace(String.valueOf(c), "\\" + c);
+                            }
+                            preparedMessage.setText(text);
+                            if(obj.get("status").getAsString().equals("admin")) {
+                                if (admins.contains(from.id())) {
+                                    messagesRepository.save(preparedMessage.setGlobal(true));
+                                    bot.execute(new SendMessage(from.id(), "Public template created"));
+                                } else {
+                                    bot.execute(new SendPhoto(from.id(), "https://static.wikia.nocookie.net/amonguslogic/images/a/a5/SUS_thumbnail.jpg"));
+                                }
+                            } else {
+                                messagesRepository.save(preparedMessage.setGlobal(false));
+                                bot.execute(new SendMessage(from.id(), "Template created"));
+                            }
+                            states.remove(from.id());
+                        } case "editTemplateName" -> {
+                            Optional<PreparedMessage> preparedMessage = messagesRepository.findPreparedMessageById(obj.get("id").getAsLong());
+                            if(preparedMessage.isPresent()) {
+                                text = getString(from, text, preparedMessage);
+                                PreparedMessage preparedMessage2 = preparedMessage.get().setName(text);
+                                messagesRepository.save(preparedMessage2);
+                                buildSingleTemplate(from.id(), preparedMessage2, obj.get("status").getAsString());
+                                states.remove(from.id());
+                            }
+                        } case "editTemplateDescription" -> {
+                            Optional<PreparedMessage> preparedMessage = messagesRepository.findPreparedMessageById(obj.get("id").getAsLong());
+                            if(preparedMessage.isPresent()) {
+                                text = getString(from, text, preparedMessage);
+                                if (text == null) return;
+                                PreparedMessage preparedMessage2 = preparedMessage.get().setText(text);
+                                messagesRepository.save(preparedMessage2);
+                                buildSingleTemplate(from.id(), preparedMessage2, obj.get("status").getAsString());
+                                states.remove(from.id());
+                            }
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    @Nullable
+    private String getString(User from, String text, Optional<PreparedMessage> preparedMessage) {
+        if(preparedMessage.get().isGlobal()) {
+            if(!admins.contains(from.id())) {
+                bot.execute(new SendPhoto(from.id(), "https://static.wikia.nocookie.net/amonguslogic/images/a/a5/SUS_thumbnail.jpg"));
+                return null;
+            }
+        }
+        text = text.replace("\\", "\\\\");
+        for(char c:toEscape) {
+            text = text.replace(String.valueOf(c), "\\" + c);
+        }
+        return text;
     }
 }

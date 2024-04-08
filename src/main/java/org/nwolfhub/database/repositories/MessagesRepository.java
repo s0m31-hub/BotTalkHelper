@@ -11,6 +11,6 @@ public interface MessagesRepository extends JpaRepository<PreparedMessage, Strin
     List<PreparedMessage> getPreparedMessagesByGlobal(boolean global);
     List<PreparedMessage> getPreparedMessagesByOwner(Long owner);
     List<PreparedMessage> getPreparedMessagesByGlobalOrOwner(boolean global, Long owner);
-    Optional<PreparedMessage> findPreparedMessageById(Long global);
+    Optional<PreparedMessage> findPreparedMessageById(Long id);
     Integer countByOwner(Long owner);
 }

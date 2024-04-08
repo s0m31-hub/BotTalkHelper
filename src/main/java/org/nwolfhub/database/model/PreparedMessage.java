@@ -13,7 +13,7 @@ public class PreparedMessage {
     @Column(length = 4096)
     public String text;
     public Long owner;
-    public boolean global;
+    public boolean global = false;
     public String name;
     public PreparedMessage() {}
 
