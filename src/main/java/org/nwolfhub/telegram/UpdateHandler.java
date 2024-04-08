@@ -186,11 +186,11 @@ public class UpdateHandler {
                     }
                 }
             }
-            case "editTemplateName" -> {
+            case "editTmpName" -> {
                 states.put(from, query);
                 bot.execute(new SendMessage(from, "Send new template name"));
             }
-            case "editTemplateDescription" -> {
+            case "editTmpDesc" -> {
                 states.put(from, query);
                 bot.execute(new SendMessage(from, "Send new template description"));
             } case "deleteTemplate1" -> bot.execute(new SendMessage(from, "Are you sure you want to delete this template?")
@@ -219,9 +219,9 @@ public class UpdateHandler {
     }
 
     private void buildSingleTemplate(Long from, PreparedMessage template, String status) {
-        bot.execute(new SendMessage(from, "You are viewing template " + template.getName() + "\n\n" + template.getText())
-                .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton[] {new InlineKeyboardButton("Edit name").callbackData("{\"action\": \"editTemplateName\", \"id\": " + ", \"status\": \"" + status + "\"}")},
-                        new InlineKeyboardButton[] {new InlineKeyboardButton("Edit description").callbackData("{\"action\": \"editTemplateDescription\", \"id\": " + template.getId() + ", \"status\": \"" + status + "\"}")},
+        SendResponse response = bot.execute(new SendMessage(from, "You are viewing template " + template.getName() + "\n\n" + template.getText())
+                .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton[] {new InlineKeyboardButton("Edit name").callbackData("{\"action\": \"editTmpName\", \"id\": " + ", \"status\": \"" + status + "\"}")},
+                        new InlineKeyboardButton[] {new InlineKeyboardButton("Edit description").callbackData("{\"action\": \"editTmpDesc\", \"id\": " + template.getId() + ", \"status\": \"" + status + "\"}")},
                         new InlineKeyboardButton[] {new InlineKeyboardButton("Delete").callbackData("{\"action\": \"deleteTemplate1\", \"id\": " + template.getId() + ", \"status\": \"" + status + "\"}")},
                         new InlineKeyboardButton[]{new InlineKeyboardButton("Return").callbackData("{\"action\": \"return\", \"status\": \"" + status + "\"}")})));
     }
@@ -335,7 +335,7 @@ public class UpdateHandler {
                                 bot.execute(new SendMessage(from.id(), "Template created"));
                             }
                             states.remove(from.id());
-                        } case "editTemplateName" -> {
+                        } case "editTmpName" -> {
                             Optional<PreparedMessage> preparedMessage = messagesRepository.findPreparedMessageById(obj.get("id").getAsLong());
                             if(preparedMessage.isPresent()) {
                                 text = getString(from, text, preparedMessage);
@@ -344,7 +344,7 @@ public class UpdateHandler {
                                 buildSingleTemplate(from.id(), preparedMessage2, obj.get("status").getAsString());
                                 states.remove(from.id());
                             }
-                        } case "editTemplateDescription" -> {
+                        } case "editTmpDesc" -> {
                             Optional<PreparedMessage> preparedMessage = messagesRepository.findPreparedMessageById(obj.get("id").getAsLong());
                             if(preparedMessage.isPresent()) {
                                 text = getString(from, text, preparedMessage);
