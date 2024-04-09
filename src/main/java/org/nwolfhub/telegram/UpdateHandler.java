@@ -6,10 +6,7 @@ import com.pengrad.telegrambot.TelegramBot;
 import com.pengrad.telegrambot.UpdatesListener;
 import com.pengrad.telegrambot.model.*;
 import com.pengrad.telegrambot.model.request.*;
-import com.pengrad.telegrambot.request.AnswerInlineQuery;
-import com.pengrad.telegrambot.request.GetMe;
-import com.pengrad.telegrambot.request.SendMessage;
-import com.pengrad.telegrambot.request.SendPhoto;
+import com.pengrad.telegrambot.request.*;
 import com.pengrad.telegrambot.response.SendResponse;
 import jakarta.annotation.PostConstruct;
 import org.jetbrains.annotations.Nullable;
@@ -159,9 +156,11 @@ public class UpdateHandler {
                 Integer count = messagesRepository.countByOwner(from);
                 if (count < 5 || queryObject.get("status").getAsString().equals("admin")) {
                     states.put(from, query);
-                    bot.execute(new SendMessage(from, "Great! Now send the name of your new template"));
+                    SendResponse response = bot.execute(new SendMessage(from, "Great! Now send the name of your new template"));
+                    bot.execute(new AnswerCallbackQuery(update.callbackQuery().id()).text(response.isOk()?response.message().messageId().toString():response.description()));
                 } else {
-                    bot.execute(new SendMessage(from, "You have maximum amount of templates"));
+                    SendResponse response = bot.execute(new SendMessage(from, "You have maximum amount of templates"));
+                    bot.execute(new AnswerCallbackQuery(update.callbackQuery().id()).text(response.isOk()?response.message().messageId().toString():response.description()));
                 }
             }
             case "editTemplate" -> {
@@ -170,7 +169,8 @@ public class UpdateHandler {
                 if (optionalMessage.isPresent()) {
                     PreparedMessage preparedMessage = optionalMessage.get();
                     if (preparedMessage.getOwner().equals(from) || (preparedMessage.global && admins.contains(from))) {
-                        buildSingleTemplate(from, preparedMessage, queryObject.get("status").getAsString());
+                       SendResponse response = buildSingleTemplate(from, preparedMessage, queryObject.get("status").getAsString());
+                       bot.execute(new AnswerCallbackQuery(update.callbackQuery().id()).text(response.isOk()?response.message().messageId().toString():response.description()));
                     }
                 }
             }
@@ -182,26 +182,31 @@ public class UpdateHandler {
                     if (preparedMessage.getOwner().equals(from) || (preparedMessage.global && admins.contains(from))) {
                         messagesRepository.delete(preparedMessage);
                         bot.execute(new SendMessage(from, "Template deleted"));
-                        buildTemplatesMenu(from, queryObject.get("status").getAsString().equals("admin") ? messagesRepository.getPreparedMessagesByGlobal(true) : messagesRepository.getPreparedMessagesByOwner(from), queryObject.get("status").getAsString().equals("admin"));
+                        SendResponse response = buildTemplatesMenu(from, queryObject.get("status").getAsString().equals("admin") ? messagesRepository.getPreparedMessagesByGlobal(true) : messagesRepository.getPreparedMessagesByOwner(from), queryObject.get("status").getAsString().equals("admin"));
+                        bot.execute(new AnswerCallbackQuery(update.callbackQuery().id()).text(response.isOk()?response.message().messageId().toString():response.description()));
                     }
                 }
             }
             case "editTmpName" -> {
                 states.put(from, query);
-                bot.execute(new SendMessage(from, "Send new template name"));
+                SendResponse response = bot.execute(new SendMessage(from, "Send new template name"));
+                bot.execute(new AnswerCallbackQuery(update.callbackQuery().id()).text(response.isOk()?response.message().messageId().toString():response.description()));
             }
             case "editTmpDesc" -> {
                 states.put(from, query);
-                bot.execute(new SendMessage(from, "Send new template description"));
+                SendResponse response = bot.execute(new SendMessage(from, "Send new template description"));
+                bot.execute(new AnswerCallbackQuery(update.callbackQuery().id()).text(response.isOk()?response.message().messageId().toString():response.description()));
             } case "deleteTemplate1" -> bot.execute(new SendMessage(from, "Are you sure you want to delete this template?")
                     .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton("yes").callbackData("{\"action\": \"deleteTemplate\", \"id\": " + queryObject.get("id").getAsString() + ", \"status\": \"" + queryObject.get("status").getAsString() + "\"}"),
                             new InlineKeyboardButton("no").callbackData("{\"action\": \"return\", \"status\": \"" + queryObject.get("status") + "\"}"))));
-            case "return" ->
-                    buildTemplatesMenu(from, queryObject.get("status").getAsString().equals("admin") ? messagesRepository.getPreparedMessagesByGlobal(true) : messagesRepository.getPreparedMessagesByOwner(from), queryObject.get("status").getAsString().equals("admin"));
+            case "return" -> {
+                SendResponse response = buildTemplatesMenu(from, queryObject.get("status").getAsString().equals("admin") ? messagesRepository.getPreparedMessagesByGlobal(true) : messagesRepository.getPreparedMessagesByOwner(from), queryObject.get("status").getAsString().equals("admin"));
+                bot.execute(new AnswerCallbackQuery(update.callbackQuery().id()).text(response.isOk()?response.message().messageId().toString():response.description()));
+            }
         }
     }
 
-    private void buildTemplatesMenu(Long from, List<PreparedMessage> templates, boolean admin) {
+    private SendResponse buildTemplatesMenu(Long from, List<PreparedMessage> templates, boolean admin) {
         List<List<InlineKeyboardButton>> buttons = new ArrayList<>();
         List<InlineKeyboardButton> active = new ArrayList<>();
         for(PreparedMessage template:templates) {
@@ -213,13 +218,13 @@ public class UpdateHandler {
         }
         active.add(new InlineKeyboardButton("New").callbackData("{\"action\": \"newTemplate\", \"status\": \"" + (admin?"admin":"normal") + "\"}"));
         buttons.add(active);
-        SendResponse response = bot.execute(new SendMessage(from, "Your templates:").replyMarkup(new InlineKeyboardMarkup(buttons.stream()
+        return bot.execute(new SendMessage(from, "Your templates:").replyMarkup(new InlineKeyboardMarkup(buttons.stream()
                 .map(l -> l.toArray(InlineKeyboardButton[]::new))
                 .toArray(InlineKeyboardButton[][]::new))));
     }
 
-    private void buildSingleTemplate(Long from, PreparedMessage template, String status) {
-        SendResponse response = bot.execute(new SendMessage(from, "You are viewing template " + template.getName() + "\n\n" + template.getText())
+    private SendResponse buildSingleTemplate(Long from, PreparedMessage template, String status) {
+        return bot.execute(new SendMessage(from, "You are viewing template " + template.getName() + "\n\n" + template.getText())
                 .replyMarkup(new InlineKeyboardMarkup(new InlineKeyboardButton[] {new InlineKeyboardButton("Edit name").callbackData("{\"action\": \"editTmpName\", \"id\": " + ", \"status\": \"" + status + "\"}")},
                         new InlineKeyboardButton[] {new InlineKeyboardButton("Edit description").callbackData("{\"action\": \"editTmpDesc\", \"id\": " + template.getId() + ", \"status\": \"" + status + "\"}")},
                         new InlineKeyboardButton[] {new InlineKeyboardButton("Delete").callbackData("{\"action\": \"deleteTemplate1\", \"id\": " + template.getId() + ", \"status\": \"" + status + "\"}")},
@@ -239,7 +244,7 @@ public class UpdateHandler {
                         This is NOT OFFICIAL bot developed by @s0m31_tg to help people format messages in @bottalk easier!
                         There's not much you can do in private: just try me in inline mode.
                         And if you feel shy to chat with others right now, just write /help
-
+                        And check out templates using /templates
                         p.s. Fuck markdown v2. The inline version of this bot ONLY uses it and its such a pain. I regret picking it over html, don't repeat my mistakes
                         """));
                 if (admins.contains(from.id())) {
@@ -255,6 +260,8 @@ public class UpdateHandler {
                     bot.execute(new SendMessage(from.id(), "hey rico"));
                 } else if (from.id() == 611938392L) {
                     bot.execute(new SendMessage(from.id(), "GODOOOOOO"));
+                } else if(from.id() == 951435494L) {
+                    bot.execute(new SendMessage(from.id(), "\uD83C\uDF3E"));
                 }
             }
             case "/cc" -> {
@@ -308,8 +315,8 @@ public class UpdateHandler {
                             }
                         } case "newTemplate2" -> {
                             PreparedMessage preparedMessage = new PreparedMessage();
-                            Integer id = random.nextInt()/1000;
-                            while (messagesRepository.findPreparedMessageById(id.longValue()).isPresent()) id = random.nextInt()/1000;
+                            Integer id = random.nextInt(10000000);
+                            while (messagesRepository.findPreparedMessageById(id.longValue()).isPresent()) id = random.nextInt(10000000);
                             preparedMessage.setId(id.longValue());
                             preparedMessage.setOwner(from.id());
                             String name = obj.get("templateName").getAsString();
@@ -318,9 +325,13 @@ public class UpdateHandler {
                                 name = name.replace(String.valueOf(c), "\\" + c);
                             }
                             preparedMessage.setName(name);
+                            HashMap<String, String> entities = replaceEntities(message, text);
                             text = text.replace("\\", "\\\\");
                             for(char c:toEscape) {
                                 text = text.replace(String.valueOf(c), "\\" + c);
+                            }
+                            for(String key:entities.keySet()) {
+                                text = text.replace(key, entities.get(key));
                             }
                             preparedMessage.setText(text);
                             if(obj.get("status").getAsString().equals("admin")) {
@@ -338,7 +349,7 @@ public class UpdateHandler {
                         } case "editTmpName" -> {
                             Optional<PreparedMessage> preparedMessage = messagesRepository.findPreparedMessageById(obj.get("id").getAsLong());
                             if(preparedMessage.isPresent()) {
-                                text = getString(from, text, preparedMessage);
+                                text = escapeChars(from, text, preparedMessage);
                                 PreparedMessage preparedMessage2 = preparedMessage.get().setName(text);
                                 messagesRepository.save(preparedMessage2);
                                 buildSingleTemplate(from.id(), preparedMessage2, obj.get("status").getAsString());
@@ -347,8 +358,14 @@ public class UpdateHandler {
                         } case "editTmpDesc" -> {
                             Optional<PreparedMessage> preparedMessage = messagesRepository.findPreparedMessageById(obj.get("id").getAsLong());
                             if(preparedMessage.isPresent()) {
-                                text = getString(from, text, preparedMessage);
+                                int prevLength = text.length();
+                                HashMap<String, String> entities = replaceEntities(message, text);
+                                text = escapeChars(from, text, preparedMessage);
                                 if (text == null) return;
+                                text = entities.get("text");
+                                for(String key:entities.keySet()) {
+                                    if(!key.equals("text")) text = text.replace(key, entities.get(key));
+                                }
                                 PreparedMessage preparedMessage2 = preparedMessage.get().setText(text);
                                 messagesRepository.save(preparedMessage2);
                                 buildSingleTemplate(from.id(), preparedMessage2, obj.get("status").getAsString());
@@ -361,8 +378,22 @@ public class UpdateHandler {
         }
     }
 
+    private HashMap<String, String> replaceEntities(Message message, String text) {
+        HashMap<String, String> entities = new HashMap<>();
+        for(MessageEntity entity:message.entities()) {
+            if(entity.type() == MessageEntity.Type.text_link) {
+                String rnd = Utils.generateString(30);
+                //text = text.substring(0, entity.offset()) + "[" + text.substring(entity.offset(), entity.offset()+entity.length()) + "](" + entity.url() + ")" + (text.length()>entity.offset()+entity.length()?text.substring(entity.offset()+entity.length()):"");
+                entities.put(rnd, "[" + text.substring(entity.offset(), entity.offset()+entity.length()) + "](" + entity.url() + ")");
+                text = text.substring(0, entity.offset()) + rnd + (text.length()>entity.offset()+entity.length()?text.substring(entity.offset()+entity.length()):"");
+            }
+        }
+        entities.put("text", text);
+        return entities;
+    }
+
     @Nullable
-    private String getString(User from, String text, Optional<PreparedMessage> preparedMessage) {
+    private String escapeChars(User from, String text, Optional<PreparedMessage> preparedMessage) {
         if(preparedMessage.get().isGlobal()) {
             if(!admins.contains(from.id())) {
                 bot.execute(new SendPhoto(from.id(), "https://static.wikia.nocookie.net/amonguslogic/images/a/a5/SUS_thumbnail.jpg"));
