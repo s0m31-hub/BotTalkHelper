@@ -380,12 +380,14 @@ public class UpdateHandler {
 
     private HashMap<String, String> replaceEntities(Message message, String text) {
         HashMap<String, String> entities = new HashMap<>();
-        for(MessageEntity entity:message.entities()) {
-            if(entity.type() == MessageEntity.Type.text_link) {
-                String rnd = Utils.generateString(30);
-                //text = text.substring(0, entity.offset()) + "[" + text.substring(entity.offset(), entity.offset()+entity.length()) + "](" + entity.url() + ")" + (text.length()>entity.offset()+entity.length()?text.substring(entity.offset()+entity.length()):"");
-                entities.put(rnd, "[" + text.substring(entity.offset(), entity.offset()+entity.length()) + "](" + entity.url() + ")");
-                text = text.substring(0, entity.offset()) + rnd + (text.length()>entity.offset()+entity.length()?text.substring(entity.offset()+entity.length()):"");
+        if(message.entities() != null) {
+            for (MessageEntity entity : message.entities()) {
+                if (entity.type() == MessageEntity.Type.text_link) {
+                    String rnd = Utils.generateString(30);
+                    //text = text.substring(0, entity.offset()) + "[" + text.substring(entity.offset(), entity.offset()+entity.length()) + "](" + entity.url() + ")" + (text.length()>entity.offset()+entity.length()?text.substring(entity.offset()+entity.length()):"");
+                    entities.put(rnd, "[" + text.substring(entity.offset(), entity.offset() + entity.length()) + "](" + entity.url() + ")");
+                    text = text.substring(0, entity.offset()) + rnd + (text.length() > entity.offset() + entity.length() ? text.substring(entity.offset() + entity.length()) : "");
+                }
             }
         }
         entities.put("text", text);
