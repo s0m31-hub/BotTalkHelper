@@ -154,7 +154,7 @@ public class UpdateHandler {
         switch (action) {
             case "newTemplate" -> {
                 Integer count = messagesRepository.countByOwner(from);
-                if (count < 5 || queryObject.get("status").getAsString().equals("admin")) {
+                if (count < 5 || queryObject.get("status").getAsString().equals("admin") || admins.contains(from)) {
                     states.put(from, query);
                     SendResponse response = bot.execute(new SendMessage(from, "Great! Now send the name of your new template"));
                     bot.execute(new AnswerCallbackQuery(update.callbackQuery().id()).text(response.isOk()?response.message().messageId().toString():response.description()));
