@@ -11,6 +11,7 @@ import com.pengrad.telegrambot.response.SendResponse;
 import jakarta.annotation.PostConstruct;
 import org.jetbrains.annotations.Nullable;
 import org.nwolfhub.database.model.PreparedMessage;
+import org.nwolfhub.database.model.SentMessage;
 import org.nwolfhub.database.model.Unit;
 import org.nwolfhub.database.repositories.FieldRepository;
 import org.nwolfhub.database.repositories.MessagesRepository;
@@ -38,6 +39,7 @@ public class UpdateHandler {
     private final FieldRepository fieldRepository;
     private final SectionRepository sectionRepository;
     private final UnitRepository unitRepository;
+    private final SentMessage sentRepository;
     private final MessagesRepository messagesRepository;
     private final Random random = new Random();
     private final QueryProcessor processor;
@@ -46,10 +48,11 @@ public class UpdateHandler {
 
     private final Map<Long, String> states = new HashMap<>();
 
-    public UpdateHandler(FieldRepository fieldRepository, SectionRepository sectionRepository, UnitRepository unitRepository, MessagesRepository messagesRepository, QueryProcessor processor, WebCacher cacher) {
+    public UpdateHandler(FieldRepository fieldRepository, SectionRepository sectionRepository, UnitRepository unitRepository, SentMessage sentRepository, MessagesRepository messagesRepository, QueryProcessor processor, WebCacher cacher) {
         this.fieldRepository = fieldRepository;
         this.sectionRepository = sectionRepository;
         this.unitRepository = unitRepository;
+        this.sentRepository = sentRepository;
         this.messagesRepository = messagesRepository;
         this.processor = processor;
         this.cacher = cacher;
